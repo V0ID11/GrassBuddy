@@ -169,10 +169,31 @@ def upload_file():
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
         
+        # Add to DB if authenticated
+        auth_header = request.headers.get('Authorization')
+        user_id = None
+        if auth_header:
+             # Extract token
+            token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+            conn = connect_db()
+            c = conn.cursor()
+            c.execute('SELECT id FROM users WHERE auth_token = ?', (token,))
+            row = c.fetchone()
+            if row:
+                user_id = row[0]
+                # Insert into photos
+                c.execute('INSERT INTO photos (filename, user_id) VALUES (?, ?)', (filename, user_id))
+                
+                
+                
+                conn.commit()
+            conn.close()
+
         return jsonify({
             'message': 'Grass touched successfully!',
             'filename': filename,
-            'url': f'/images/{filename}'
+            'url': f'/images/{filename}',
+            'score_added': 0 if user_id else 0
         }), 201
         
     return jsonify({'error': 'File type not allowed'}), 400
