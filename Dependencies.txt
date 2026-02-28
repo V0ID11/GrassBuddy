@@ -1,4 +1,5 @@
 PyQt5
 flask
-sqlite3
+requests
+
 

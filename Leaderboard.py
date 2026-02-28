@@ -18,7 +18,7 @@ class MyWindow(QtWidgets.QMainWindow):
         self.status_label.setText("Processing...")
     def refresh_leaderboard(self):
             try:
-                URL = "http://10.14.210.2:5000/leaderboard" 
+                URL = "http://10.2.0.2:5000/leaderboard" 
                 response = requests.get(URL)
                 data = response.json().get('leaderboard_data', [])
 

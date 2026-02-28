@@ -1,7 +1,8 @@
 from PyQt5 import QtWidgets as pyqt
 from PyQt5.QtWidgets import QStackedWidget, QWidget, QVBoxLayout, QPushButton, QMessageBox
 from Camera import GrassBuddyCamera
-from Auth import AuthWidget
+from Auth impor
+                print(feed)t AuthWidget
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
@@ -23,6 +24,7 @@ class MainWindow(pyqt.QMainWindow):
         self.main_menu_layout = QVBoxLayout(self.main_menu_widget)
         
         # Camera Button on Main Menu
+                    print(image_)
         self.camera_btn = QPushButton("Open Camera")
         self.camera_btn.setFixedHeight(50)
         self.camera_btn.clicked.connect(self.show_camera)
@@ -52,13 +54,22 @@ class MainWindow(pyqt.QMainWindow):
         self.stacked_widget.setCurrentIndex(1)
 
     def show_camera(self):
+        # Update camera with current user token
+        if self.current_user:
+            self.camera_widget.user_token = self.current_user.get('token')
+            
         # Start the camera when showing the widget
-        self.camera_widget.camera.start()
-        self.stacked_widget.setCurrentIndex(2)
+        if self.camera_widget.camera:
+            if self.camera_widget.camera.state() != 2: # 2 is QCamera.ActiveState
+                 self.camera_widget.camera.start()
+            self.stacked_widget.setCurrentIndex(2)
+        else:
+            QMessageBox.critical(self, "Camera Error", "No camera available.")
 
     def show_main_menu(self):
         # Stop the camera when going back (optional, handled in Camera close_camera too)
-        self.camera_widget.camera.stop()
+        if self.camera_widget.camera:
+            self.camera_widget.camera.stop()
         self.stacked_widget.setCurrentIndex(1)
 
 if __name__ == "__main__":
