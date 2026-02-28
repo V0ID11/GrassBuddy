@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 DB_NAME = 'grassbuddy.db'
 
@@ -23,8 +24,10 @@ def seed_database():
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
             name TEXT NOT NULL,
-            auth_token TEXT NOT NULL UNIQUE,
+            auth_token TEXT,
             score INTEGER DEFAULT 0
         )
     ''')
@@ -60,12 +63,13 @@ def seed_database():
 
     print("Inserting users...")
     users = [
-        ('Nick', 'auth_nick_1'),
-        ('Sarah', 'auth_sarah_2'),
-        ('Mike', 'auth_mike_3'),
-        ('Emma', 'auth_emma_4')
+        ('nick123', generate_password_hash('password'), 'Nick', 'auth_nick_1'),
+        ('sarah_cool', generate_password_hash('password'), 'Sarah', 'auth_sarah_2'),
+        ('mike_touch', generate_password_hash('password'), 'Mike', 'auth_mike_3'),
+        ('emma_grass', generate_password_hash('password'), 'Emma', 'auth_emma_4'),
+        ('sam_pards', generate_password_hash('password'), 'Sam', 'auth_sam_5')
     ]
-    c.executemany("INSERT INTO users (name, auth_token) VALUES (?, ?)", users)
+    c.executemany("INSERT INTO users (username, password_hash, name, auth_token) VALUES (?, ?, ?, ?)", users)
     
     # Get user Ids
     c.execute("SELECT id, name FROM users")
@@ -79,7 +83,9 @@ def seed_database():
         (db_users['Nick'], db_users['Mike']),
         (db_users['Mike'], db_users['Nick']),
         (db_users['Sarah'], db_users['Emma']),
-        (db_users['Emma'], db_users['Sarah'])
+        (db_users['Emma'], db_users['Sarah']),
+        (db_users['Nick'], db_users['Sam']),
+        (db_users['Sam'], db_users['Nick']),
     ]
     c.executemany("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", friendships)
 
