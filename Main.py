@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 import requests
 from Camera import GrassBuddyCamera
 from Auth import AuthWidget
+from Leaderboard import GrassBuddyLeaderboard
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
@@ -31,6 +32,12 @@ class MainWindow(pyqt.QMainWindow):
         self.camera_btn.clicked.connect(self.show_camera)
         self.main_menu_layout.addWidget(self.camera_btn)
 
+        # Leaderboard Button
+        self.leaderboard_btn = QPushButton("Leaderboard")
+        self.leaderboard_btn.setFixedHeight(50)
+        self.leaderboard_btn.clicked.connect(self.show_leaderboard)
+        self.main_menu_layout.addWidget(self.leaderboard_btn)
+
         # Feed Label
         self.feed_label = QLabel("Recent Feed (Top 10):")
         self.main_menu_layout.addWidget(self.feed_label)
@@ -55,12 +62,21 @@ class MainWindow(pyqt.QMainWindow):
         
         # Add Camera to stack
         self.stacked_widget.addWidget(self.camera_widget)
+
+        # 4. Leaderboard Widget (Index 3)
+        self.leaderboard_widget = GrassBuddyLeaderboard()
+        self.leaderboard_widget.back_signal.connect(self.show_main_menu)
+        self.stacked_widget.addWidget(self.leaderboard_widget)
         
         # Start at Login (Index 0)
         self.stacked_widget.setCurrentIndex(0)
         
         # User auth state (token, id, name)
         self.current_user = None
+
+    def show_leaderboard(self):
+        self.leaderboard_widget.refresh_leaderboard()
+        self.stacked_widget.setCurrentIndex(3)
 
     def on_login_success(self, user_data):
         self.current_user = user_data
