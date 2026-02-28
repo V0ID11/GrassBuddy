@@ -1,4 +1,4 @@
-
+import os
 from FlaskBackend import get_leaderboard_data
 import sys
 from PyQt5 import QtWidgets, uic, QtCore
@@ -44,7 +44,7 @@ class GrassBuddyLeaderboard(QtWidgets.QMainWindow):
     def refresh_leaderboard(self):
             try:
                 # Use localhost for testing if needed, or keeping the IP
-                URL = "http://10.2.0.2:5000/leaderboard" 
+                URL = f"{os.getenv("GRASSAPI")}/leaderboard" 
                 try:
                     response = requests.get(URL, timeout=2)
                 except:

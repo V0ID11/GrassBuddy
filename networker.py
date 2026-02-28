@@ -5,7 +5,7 @@ import time
 import os
 
 # Default, but can be overridden
-DEFAULT_API = "http://10.2.0.2:5000" 
+DEFAULT_API = os.getenv("GRASSAPI")
 
 class Nudger(QThread):
     """

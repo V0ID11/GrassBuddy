@@ -1,10 +1,11 @@
+import os
 import requests
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, 
                              QMessageBox, QHBoxLayout, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
 
 # Change this to your server IP if running on a different machine
-SERVER_URL = "http://127.0.0.1:5000"
+SERVER_URL = os.getenv("GRASSAPI")
 
 class AuthWidget(QWidget):
     # Signals to communicate with the main window
@@ -120,7 +121,7 @@ class AuthWidget(QWidget):
             response = requests.post(f"{SERVER_URL}/login", json={
                 "username": username,
                 "password": password
-            })
+            }, timeout=5)
             
             if response.status_code == 200:
                 data = response.json()
@@ -130,8 +131,9 @@ class AuthWidget(QWidget):
                 error_msg = response.json().get('error', 'Login failed')
                 QMessageBox.warning(self, "Login Error", error_msg)
                 
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError as e:
             QMessageBox.critical(self, "Connection Error", "Could not connect to server. Is it running?")
+            print(e)
 
     def handle_register(self):
         name = self.name_input.text()
@@ -147,7 +149,7 @@ class AuthWidget(QWidget):
                 "name": name,
                 "username": username,
                 "password": password
-            })
+            }, timeout=5)
             
             if response.status_code == 201:
                 QMessageBox.information(self, "Success", "Account created! Please login.")

@@ -8,7 +8,7 @@ from PyQt5.QtMultimediaWidgets import QCameraViewfinder
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 
 # SERVER_URL should match your Flask server
-SERVER_URL = "http://10.2.0.2:5000"
+SERVER_URL = os.getenv("GRASSAPI")
 
 class GrassBuddyCamera(QWidget):
     camera_closed = pyqtSignal()

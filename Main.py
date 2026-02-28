@@ -11,7 +11,7 @@ from networker import NudgeListener
 from Stylesheet import Stylesheet
 
 # Assuming server is local for now
-SERVER_URL = "http://10.2.0.2:5000"
+SERVER_URL = os.getenv("GRASSAPI")
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
@@ -160,7 +160,7 @@ class MainWindow(pyqt.QMainWindow):
 
         try:
             # Assume backend is running on localhost:5000
-            response = requests.get('http://10.2.0.2:5000/feed')
+            response = requests.get(f'{os.getenv("GRASSAPI")}/feed')
             if response.status_code == 200:
                 data = response.json()
                 feed_items = data.get('feed', [])
@@ -179,7 +179,7 @@ class MainWindow(pyqt.QMainWindow):
                     # Image
                     img_label = QLabel()
                     img_label.setStyleSheet("border: none; background-color: transparent;")
-                    image_url = f"http://10.2.0.2:5000{item['url']}"
+                    image_url = f"{os.getenv("GRASSAPI")}{item['url']}"
                     
                     try:
                         img_data = requests.get(image_url).content

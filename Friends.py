@@ -4,9 +4,10 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import pyqtSignal, Qt
 import requests
 from networker import Nudger
+import os
 
 # Assuming server is local for now, can be configured
-SERVER_URL = "http://10.2.0.2:5000"
+SERVER_URL = os.getenv("GRASSAPI")
 
 class FriendItem(QWidget):
     def __init__(self, user_id, name, token, parent=None):
