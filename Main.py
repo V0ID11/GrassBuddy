@@ -7,6 +7,7 @@ from Camera import GrassBuddyCamera
 from Auth import AuthWidget
 from Leaderboard import GrassBuddyLeaderboard
 from Friends import FriendsWidget
+from MapScreen import MapScreen
 from networker import NudgeListener
 from Stylesheet import Stylesheet
 import os
@@ -73,6 +74,12 @@ class MainWindow(pyqt.QMainWindow):
         self.friends_btn.clicked.connect(self.show_friends)
         self.main_menu_layout.addWidget(self.friends_btn)
 
+        # Map Button
+        self.map_btn = QPushButton("Find Nearest Park")
+        self.map_btn.setFixedHeight(50)
+        self.map_btn.clicked.connect(self.show_map)
+        self.main_menu_layout.addWidget(self.map_btn)
+
         # Feed Label
         self.feed_label = QLabel("Recent Feed (Top 10):")
         self.main_menu_layout.addWidget(self.feed_label)
@@ -108,6 +115,11 @@ class MainWindow(pyqt.QMainWindow):
         self.friends_widget.back_signal.connect(self.show_main_menu)
         self.stacked_widget.addWidget(self.friends_widget)
         
+        # 6. Map Widget (Index 5)
+        self.map_widget = MapScreen()
+        self.map_widget.back_signal.connect(self.show_main_menu)
+        self.stacked_widget.addWidget(self.map_widget)
+        
         # Start at Login (Index 0)
         self.stacked_widget.setCurrentIndex(0)
         
@@ -125,6 +137,9 @@ class MainWindow(pyqt.QMainWindow):
             self.friends_widget.load_friends()
             self.friends_widget.load_requests()
         self.stacked_widget.setCurrentIndex(4)
+
+    def show_map(self):
+        self.stacked_widget.setCurrentIndex(5)
 
     def on_login_success(self, user_data):
         self.current_user = user_data
@@ -180,7 +195,7 @@ class MainWindow(pyqt.QMainWindow):
                     # Image
                     img_label = QLabel()
                     img_label.setStyleSheet("border: none; background-color: transparent;")
-                    image_url = f"{os.getenv("GRASSAPI")}{item['url']}"
+                    image_url = f"{os.getenv('GRASSAPI')}{item['url']}"
                     
                     try:
                         img_data = requests.get(image_url).content

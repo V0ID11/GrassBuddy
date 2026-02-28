@@ -44,7 +44,7 @@ class GrassBuddyLeaderboard(QtWidgets.QMainWindow):
     def refresh_leaderboard(self):
             try:
                 # Use localhost for testing if needed, or keeping the IP
-                URL = f"{os.getenv("GRASSAPI")}/leaderboard" 
+                URL = f"{os.getenv('GRASSAPI')}/leaderboard"
                 try:
                     response = requests.get(URL, timeout=2)
                 except:
