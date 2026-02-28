@@ -133,13 +133,21 @@ def get_feed():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/notifications/<user_auth_token>', methods=['GET'])
-def get_notifications(user_auth_token):
+@app.route('/notifications', methods=['GET'])
+def get_notifications():
+    # Authenticate User
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
+    
+    # Extract token
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+
     conn = connect_db()
     c = conn.cursor()
     
-    # 1. Find user by auth_token
-    c.execute('SELECT id FROM users WHERE auth_token = ?', (user_auth_token,))
+    # 1. Verify User
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
     user_row = c.fetchone()
     
     if not user_row:
@@ -147,7 +155,8 @@ def get_notifications(user_auth_token):
         return jsonify({'error': 'Invalid auth token'}), 401
     
     user_id = user_row[0]
-    print(f"Fetching notifications for user ID: {user_id}")
+    print(f"Fetching notifications for user ID: {user_id} ({user_row[1]})")
+
     # 2. Get notifications for this user
     c.execute('SELECT id, type, message, timestamp FROM notifications WHERE user_id = ? ORDER BY timestamp ASC', (user_id,))
     notifs = c.fetchall()
@@ -160,7 +169,7 @@ def get_notifications(user_auth_token):
             'type': n_type,
             'message': msg,
             'timestamp': ts,
-            'from': 'Anonymous Friend' # In a real app, join with sender_id if you store it
+            'from': 'See message'
         })
     
     # 3. Delete notifications (or mark as read) so they aren't shown again
@@ -199,35 +208,53 @@ def get_friends(user_id):
             
     return jsonify({'friends': friends_list}), 200
 
-@app.route('/nudge/<user_id>', methods=['POST', 'GET'])
-def nudge_person(user_id):
+@app.route('/nudge/<target_user_id>', methods=['POST'])
+def nudge_person(target_user_id):
+    # Authenticate Sender
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
+    
+    # Extract token (Bearer <token> or simply <token>)
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+
     conn = connect_db()
     c = conn.cursor()
     
-    # Find target user
-    c.execute('SELECT id, name FROM users WHERE id = ?', (user_id,))
-    target_user = c.fetchone()
-    print(f"NUDGE REQUEST: User {user_id} is being nudged to touch grass.")
+    # 1. Verify Sender
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+    sender_row = c.fetchone()
     
-    if not target_user:
+    if not sender_row:
         conn.close()
-        return jsonify({'error': 'User not found'}), 404
+        return jsonify({'error': 'Invalid auth token'}), 401
+    
+    sender_id, sender_name = sender_row
 
-    target_id, target_name = target_user
+    # 2. Find Target User
+    c.execute('SELECT id, name FROM users WHERE id = ?', (target_user_id,))
+    target_row = c.fetchone()
+    
+    if not target_row:
+        conn.close()
+        return jsonify({'error': 'Target user not found'}), 404
 
-    # Add nudge to the notifications table
-    # Standard format: type, message, user_id
+    target_id, target_name = target_row
+
+    # 3. Add Nudge Notification with Sender Info
+    message = f"Go touch grass! (from {sender_name})"
     c.execute('INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)',
-              (target_id, 'NUDGE', 'Go touch grass!'))
+              (target_id, 'NUDGE', message))
+    
     conn.commit()
     conn.close()
 
-    print(f"NUDGE SENT: Someone nudged {target_name} (ID: {user_id}) to go touch grass!")
+    print(f"NUDGE: {sender_name} -> {target_name} ({target_user_id})")
     
     return jsonify({
         'message': f'You successfully nudged {target_name}!',
-        'target_id': user_id,
-        'target_name': target_name,
+        'target_id': target_id,
+        'sender_id': sender_id,
         'action': 'TOUCH_GRASS'
     }), 200
 
