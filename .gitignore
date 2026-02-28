@@ -4,3 +4,4 @@ testenv
 __pycache__
 grass_photos
 GrassBuddy.db
+.jpg
