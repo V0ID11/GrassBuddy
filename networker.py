@@ -2,10 +2,9 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 import requests
 import time
-import re
+import os
 
-
-api = "http://10.14.210.2:5000"
+api = os.getenv("GRASSAPI")
 nudge_url = f"{api}/nudge"
 listen_url = f"{api}/notifications"
 
@@ -59,8 +58,6 @@ class NudgeListener(QThread):
                     data = response.json()
                     for nudge in data.get("notifications"):
                         message = nudge['message']
-                        #name = re.search("(from *)", message).string
-                        #message_content = ""
                         self.nudge_received.emit(message)
 
             except Exception as e:
