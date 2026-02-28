@@ -3,3 +3,4 @@ testenv
 .vscode
 __pycache__
 grass_photos
+GrassBuddy.db
