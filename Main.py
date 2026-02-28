@@ -1,4 +1,4 @@
-from PyQt6 import QtWidgets as pyqt
+from PyQt5 import QtWidgets as pyqt
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
