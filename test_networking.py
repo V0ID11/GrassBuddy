@@ -1,7 +1,10 @@
+import os
 import sys
 import networker
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QLabel, QWidget
 
+s_auth = os.getenv("SAMAUTH")
+n_auth = os.getenv("NICKAUTH")
 
 class TestApp(QMainWindow):
     def __init__(self):
@@ -21,13 +24,13 @@ class TestApp(QMainWindow):
         self.setCentralWidget(container)
 
         # Start Listener
-        self.listener = networker.NudgeListener("auth_nick_1")
+        self.listener = networker.NudgeListener(n_auth)
         self.listener.nudge_received.connect(self.on_nudge)
         self.listener.start()
 
     def send_test_nudge(self):
         self.status_label.setText("Sending...")
-        self.nudger = networker.Nudger("1", "auth_sarah_2")
+        self.nudger = networker.Nudger("1", s_auth)
         self.nudger.start()
 
     def on_nudge(self, sender):
