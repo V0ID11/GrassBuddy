@@ -1,2 +1,4 @@
-PyQt6 
-
+PyQt6
+json
+random
+requests
