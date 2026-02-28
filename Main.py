@@ -1,6 +1,7 @@
 from PyQt5 import QtWidgets as pyqt
-from PyQt5.QtWidgets import QStackedWidget, QWidget, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QStackedWidget, QWidget, QVBoxLayout, QPushButton, QMessageBox
 from Camera import GrassBuddyCamera
+from Auth import AuthWidget
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
@@ -11,8 +12,13 @@ class MainWindow(pyqt.QMainWindow):
         # QStackedWidget to hold multiple views
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
+        
+        # 1. Login/Auth View (Index 0)
+        self.auth_widget = AuthWidget()
+        self.auth_widget.login_success.connect(self.on_login_success)
+        self.stacked_widget.addWidget(self.auth_widget)
 
-        # 1. Main Menu Widget
+        # 2. Main Menu Widget (Index 1)
         self.main_menu_widget = QWidget()
         self.main_menu_layout = QVBoxLayout(self.main_menu_widget)
         
@@ -22,26 +28,38 @@ class MainWindow(pyqt.QMainWindow):
         self.camera_btn.clicked.connect(self.show_camera)
         self.main_menu_layout.addWidget(self.camera_btn)
 
-        # Add Main Menu to stack (Index 0)
+        # Add Main Menu to stack
         self.stacked_widget.addWidget(self.main_menu_widget)
 
-        # 2. Camera Widget
+        # 3. Camera Widget (Index 2)
         self.camera_widget = GrassBuddyCamera()
         # Connect the camera's close signal to go back to main menu
         self.camera_widget.camera_closed.connect(self.show_main_menu)
         
-        # Add Camera to stack (Index 1)
+        # Add Camera to stack
         self.stacked_widget.addWidget(self.camera_widget)
+        
+        # Start at Login (Index 0)
+        self.stacked_widget.setCurrentIndex(0)
+        
+        # User auth state (token, id, name)
+        self.current_user = None
+
+    def on_login_success(self, user_data):
+        self.current_user = user_data
+        QMessageBox.information(self, "Welcome", f"Welcome back, {user_data['name']}!")
+        # Switch to Main Menu
+        self.stacked_widget.setCurrentIndex(1)
 
     def show_camera(self):
         # Start the camera when showing the widget
         self.camera_widget.camera.start()
-        self.stacked_widget.setCurrentIndex(1)
+        self.stacked_widget.setCurrentIndex(2)
 
     def show_main_menu(self):
         # Stop the camera when going back (optional, handled in Camera close_camera too)
         self.camera_widget.camera.stop()
-        self.stacked_widget.setCurrentIndex(0)
+        self.stacked_widget.setCurrentIndex(1)
 
 if __name__ == "__main__":
     app = pyqt.QApplication([])

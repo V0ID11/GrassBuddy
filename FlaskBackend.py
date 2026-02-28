@@ -1,8 +1,10 @@
 import os
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 import socket
 import sqlite3
+import uuid
 
 app = Flask(__name__)
 
@@ -29,8 +31,10 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
             name TEXT NOT NULL,
-            auth_token TEXT NOT NULL UNIQUE,
+            auth_token TEXT,
             score INTEGER DEFAULT 0
         )
     ''')
@@ -77,6 +81,76 @@ def connect_db():
 @app.route('/')
 def index():
     return "GrassBuddy Server is Running! Touch Grass."
+
+@app.route('/register', methods=['POST'])
+def register():
+    # Expects JSON: {"username": "foo", "password": "bar", "name": "Foo Bar"}
+    data = request.get_json()
+    if not data or not all(k in data for k in ('username', 'password', 'name')):
+        return jsonify({'error': 'Missing fields'}), 400
+    
+    username = data['username']
+    password = data['password']
+    name = data['name']
+    
+    # Hash the password
+    # Standard practice: Hash on the server.
+    # The complexity of securely handling seeds/salts on the client is hard.
+    # We rely on HTTPS to protect the password in transit.
+    hashed_pw = generate_password_hash(password)
+    
+    conn = connect_db()
+    c = conn.cursor()
+    
+    try:
+        c.execute('INSERT INTO users (username, password_hash, name) VALUES (?, ?, ?)', 
+                  (username, hashed_pw, name))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'error': 'Username already exists'}), 409
+        
+    conn.close()
+    return jsonify({'message': 'User registered successfully'}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    if not data or not all(k in data for k in ('username', 'password')):
+        return jsonify({'error': 'Missing fields'}), 400
+        
+    username = data['username']
+    password = data['password']
+    
+    conn = connect_db()
+    c = conn.cursor()
+    
+    c.execute('SELECT id, password_hash, name FROM users WHERE username = ?', (username,))
+    row = c.fetchone()
+    
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Invalid credentials'}), 401
+        
+    user_id, stored_hash, name = row
+    
+    if check_password_hash(stored_hash, password):
+        # Login success! Generate a token for this session
+        token = str(uuid.uuid4())
+        
+        c.execute('UPDATE users SET auth_token = ? WHERE id = ?', (token, user_id))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'user_id': user_id,
+            'name': name
+        }), 200
+    else:
+        conn.close()
+        return jsonify({'error': 'Invalid credentials'}), 401
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
