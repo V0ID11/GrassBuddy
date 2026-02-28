@@ -151,7 +151,7 @@ class AuthWidget(QWidget):
                 "password": password
             }, timeout=5)
             
-            if response.status_code == 201:
+            if response.status_code == 200:
                 QMessageBox.information(self, "Success", "Account created! Please login.")
                 self.show_login()
             else:
