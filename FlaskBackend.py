@@ -2,6 +2,7 @@ import os
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 import socket
+import sqlite3
 
 app = Flask(__name__)
 
@@ -19,6 +20,59 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def init_db():
+    conn = sqlite3.connect('grassbuddy.db')
+    c = conn.cursor()
+    
+    # Create users table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            auth_token TEXT NOT NULL UNIQUE,
+            score INTEGER DEFAULT 0
+        )
+    ''')
+    
+    # Create photos table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            user_id INTEGER,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''')
+    
+    # Create notifications table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            type TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id))''')
+    
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS friends (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            friend_id INTEGER,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(friend_id) REFERENCES users(id)
+        
+        )
+    ''')
+
+    
+    conn.commit()
+    conn.close()
+
+def connect_db():
+    return sqlite3.connect('grassbuddy.db')
 
 @app.route('/')
 def index():
@@ -51,22 +105,27 @@ def upload_file():
 
 @app.route('/feed', methods=['GET'])
 def get_feed():
-    # List all files in the upload directory
-    # In a real app, you'd store metadata in a database
-    files = []
-    if os.path.exists(UPLOAD_FOLDER):
-        for filename in os.listdir(UPLOAD_FOLDER):
-            if allowed_file(filename):
-                # Sort by modification time (newest first)
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                files.append({
-                    'filename': filename,
-                    'url': f'/images/{filename}',
-                    'timestamp': os.path.getmtime(filepath)
-                })
+    conn = connect_db()
+    c = conn.cursor()
+    # Join photos with users to get the uploader's name
+    c.execute('''
+        SELECT photos.filename, photos.timestamp, users.name 
+        FROM photos 
+        LEFT JOIN users ON photos.user_id = users.id 
+        ORDER BY photos.timestamp DESC
+    ''')
+    rows = c.fetchall()
+    conn.close()
     
-    # Sort by timestamp descending
-    files.sort(key=lambda x: x['timestamp'], reverse=True)
+    files = []
+    for row in rows:
+        filename, timestamp, user_name = row
+        files.append({
+            'filename': filename,
+            'url': f'/images/{filename}',
+            'timestamp': timestamp,
+            'user': user_name or 'Anonymous'
+        })
     
     return jsonify({'feed': files}), 200
 
@@ -74,41 +133,128 @@ def get_feed():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# Mock database of users and their friends
-users = {
-    '1': {'name': 'Nick', 'friends': ['2', '3']},
-    '2': {'name': 'Sarah', 'friends': ['1']},
-    '3': {'name': 'Mike', 'friends': ['1']}
-}
+@app.route('/notifications', methods=['GET'])
+def get_notifications():
+    # Authenticate User
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
+    
+    # Extract token
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # 1. Verify User
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+    user_row = c.fetchone()
+    
+    if not user_row:
+        conn.close()
+        return jsonify({'error': 'Invalid auth token'}), 401
+    
+    user_id = user_row[0]
+    print(f"Fetching notifications for user ID: {user_id} ({user_row[1]})")
+
+    # 2. Get notifications for this user
+    c.execute('SELECT id, type, message, timestamp FROM notifications WHERE user_id = ? ORDER BY timestamp ASC', (user_id,))
+    notifs = c.fetchall()
+    
+    response_data = []
+    for notif in notifs:
+        notif_id, n_type, msg, ts = notif
+        response_data.append({
+            'id': notif_id,
+            'type': n_type,
+            'message': msg,
+            'timestamp': ts,
+            'from': 'See message'
+        })
+    
+    # 3. Delete notifications (or mark as read) so they aren't shown again
+    if notifs:
+        c.execute('DELETE FROM notifications WHERE user_id = ?', (user_id,))
+        conn.commit()
+    
+    conn.close()
+    return jsonify({'notifications': response_data}), 200
 
 @app.route('/users/<user_id>/friends', methods=['GET'])
 def get_friends(user_id):
-    user = users.get(user_id)
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # Verify user exists
+    c.execute('SELECT id, name FROM users WHERE id = ?', (user_id,))
+    user = c.fetchone()
     if not user:
+        conn.close()
         return jsonify({'error': 'User not found'}), 404
     
-    friends_list = []
-    for friend_id in user['friends']:
-        friend = users.get(friend_id)
-        if friend:
-            friends_list.append({'id': friend_id, 'name': friend['name']})
+    # Get friends (users linked in friends table)
+    # This assumes friends table stores user_id -> friend_id relationship
+    c.execute('''
+        SELECT users.id, users.name 
+        FROM users 
+        JOIN friends ON users.id = friends.friend_id 
+        WHERE friends.user_id = ?
+    ''', (user_id,))
+    
+    rows = c.fetchall()
+    conn.close()
+    
+    friends_list = [{'id': r[0], 'name': r[1]} for r in rows]
             
     return jsonify({'friends': friends_list}), 200
 
-@app.route('/nudge/<user_id>', methods=['POST', 'GET'])
-def nudge_person(user_id):
-    target_user = users.get(user_id)
+@app.route('/nudge/<target_user_id>', methods=['POST'])
+def nudge_person(target_user_id):
+    # Authenticate Sender
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
     
-    if not target_user:
-        return jsonify({'error': 'User not found'}), 404
+    # Extract token (Bearer <token> or simply <token>)
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
 
-    # In a real app, this would send a push notification or update a database
-    print(f"NUDGE SENT: Someone nudged {target_user['name']} (ID: {user_id}) to go touch grass!")
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # 1. Verify Sender
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+    sender_row = c.fetchone()
+    
+    if not sender_row:
+        conn.close()
+        return jsonify({'error': 'Invalid auth token'}), 401
+    
+    sender_id, sender_name = sender_row
+
+    # 2. Find Target User
+    c.execute('SELECT id, name FROM users WHERE id = ?', (target_user_id,))
+    target_row = c.fetchone()
+    
+    if not target_row:
+        conn.close()
+        return jsonify({'error': 'Target user not found'}), 404
+
+    target_id, target_name = target_row
+
+    # 3. Add Nudge Notification with Sender Info
+    message = f"Go touch grass! (from {sender_name})"
+    c.execute('INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)',
+              (target_id, 'NUDGE', message))
+    
+    conn.commit()
+    conn.close()
+
+    print(f"NUDGE: {sender_name} -> {target_name} ({target_user_id})")
     
     return jsonify({
-        'message': f'You successfully nudged {target_user["name"]}!',
-        'target_id': user_id,
-        'target_name': target_user['name'],
+        'message': f'You successfully nudged {target_name}!',
+        'target_id': target_id,
+        'sender_id': sender_id,
         'action': 'TOUCH_GRASS'
     }), 200
 
@@ -123,7 +269,23 @@ def get_ip_address():
     except Exception:
         return "127.0.0.1"
 
+@app.route('/add_user/<name>', methods=['POST'])
+def add_user(name):
+    db = connect_db()
+    c = db.cursor()
+    # Generate a simple auth token (in production, use something secure)
+    auth_token = f"auth_{name.lower()}_{len(users) + 1}"
+    c.execute("INSERT INTO users (name, auth_token) VALUES (?, ?)", (name, auth_token))
+    db.commit()
+    user_id = c.lastrowid
+    db.close()
+
 if __name__ == '__main__':
+    # Initialize DB (create tables if they don't exist)
+    if not os.path.exists('grassbuddy.db'):
+        init_db()
+        print("Initialized database 'grassbuddy.db'")
+
     # host='0.0.0.0' allows other devices on the network to access it
     ip = get_ip_address()
     print(f"\n--- GrassBuddy Server ---")
