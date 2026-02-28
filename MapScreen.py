@@ -22,7 +22,7 @@ class MapScreen(QWidget):
         self.back_btn.clicked.connect(self.back_signal.emit)
         header_layout.addWidget(self.back_btn)
         
-        self.title_label = QLabel("Nearest Park")
+        self.title_label = QLabel("Nearby Park")
         self.title_label.setObjectName("header_label")
         self.title_label.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(self.title_label)
@@ -48,7 +48,7 @@ class MapScreen(QWidget):
         self.layout.addWidget(self.map_label)
         
         # Action Button
-        self.find_btn = QPushButton("Find Nearest Park")
+        self.find_btn = QPushButton("Find Nearby Park")
         self.find_btn.clicked.connect(self.load_map_data)
         self.layout.addWidget(self.find_btn)
         
@@ -67,7 +67,7 @@ class MapScreen(QWidget):
             # 1. Update User Location
             self.location_manager.set_user_location()
             
-            # 2. Find Nearest Park
+            # 2. Find Nearby Park
             self.park_name_label.setText("Searching for parks...")
             QApplication.processEvents()
             self.location_manager.set_grass_location()
@@ -99,4 +99,4 @@ class MapScreen(QWidget):
             print(f"Map Error: {e}")
         
         self.find_btn.setEnabled(True)
-        self.find_btn.setText("Find Nearest Park")
+        self.find_btn.setText("Find Nearby Park")

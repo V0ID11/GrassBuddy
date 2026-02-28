@@ -75,7 +75,7 @@ class MainWindow(pyqt.QMainWindow):
         self.main_menu_layout.addWidget(self.friends_btn)
 
         # Map Button
-        self.map_btn = QPushButton("Find Nearest Park")
+        self.map_btn = QPushButton("Find Nearby Park")
         self.map_btn.setFixedHeight(50)
         self.map_btn.clicked.connect(self.show_map)
         self.main_menu_layout.addWidget(self.map_btn)
