@@ -1,14 +1,14 @@
 import sys
 import os
 import time
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QMessageBox,QHBoxLayout
 from PyQt5.QtMultimedia import QCamera, QCameraInfo, QCameraImageCapture
 from PyQt5.QtMultimediaWidgets import QCameraViewfinder
 from PyQt5.QtCore import Qt
 
 class GrassBuddyCamera(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("GrassBuddy Camera")
         self.setGeometry(100, 100, 800, 600)
 
@@ -23,8 +23,8 @@ class GrassBuddyCamera(QMainWindow):
             QMessageBox.warning(self, "Error", "No camera content found.")
             sys.exit()
 
-        # Use the default camera (usually the back camera on mobile or webcam on PC)
-        self.camera = QCamera(self.available_cameras[0])
+        self.current_camera_index = 0
+        self.camera = QCamera(self.available_cameras[self.current_camera_index])
 
         # Viewfinder to see what the camera sees
         self.viewfinder = QCameraViewfinder()
@@ -36,14 +36,39 @@ class GrassBuddyCamera(QMainWindow):
         self.image_capture.imageCaptured.connect(self.image_captured)
         self.image_capture.imageSaved.connect(self.image_saved)
 
+        # Camera Controls Layout
+        self.controls_layout = QHBoxLayout()
+        self.layout.addLayout(self.controls_layout)
+
+        # Switch Camera Button (only if multiple cameras exist)
+        if len(self.available_cameras) > 1:
+            self.switch_btn = QPushButton("Switch Camera")
+            self.switch_btn.setFixedHeight(50)
+            self.switch_btn.clicked.connect(self.switch_camera)
+            self.controls_layout.addWidget(self.switch_btn)
+
         # Capture Button
         self.capture_btn = QPushButton("Touch Grass (Take Photo)")
         self.capture_btn.setFixedHeight(50)
         self.capture_btn.clicked.connect(self.capture_image)
-        self.layout.addWidget(self.capture_btn)
+        self.controls_layout.addWidget(self.capture_btn)
 
         # Start Camera
         self.camera.start()
+
+    def switch_camera(self):
+        self.camera.stop()
+        self.current_camera_index = (self.current_camera_index + 1) % len(self.available_cameras)
+        self.camera = QCamera(self.available_cameras[self.current_camera_index])
+        self.camera.setViewfinder(self.viewfinder)
+        
+        # We need to recreate the image capture object for the new camera
+        self.image_capture = QCameraImageCapture(self.camera)
+        self.image_capture.imageCaptured.connect(self.image_captured)
+        self.image_capture.imageSaved.connect(self.image_saved)
+        
+        self.camera.start()
+
 
     def capture_image(self):
         # Generate a timestamp for the filename
@@ -63,6 +88,7 @@ class GrassBuddyCamera(QMainWindow):
     def image_saved(self, id, filename):
         print(f"Image saved to: {filename}")
         QMessageBox.information(self, "Success", f"Grass touched! Photo saved to:\n{filename}")
+        self.close()
 
     def closeEvent(self, event):
         if self.camera.state() == QCamera.ActiveState:
