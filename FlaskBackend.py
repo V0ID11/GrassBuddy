@@ -71,6 +71,19 @@ def init_db():
         )
     ''')
 
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER,
+            receiver_id INTEGER,
+            status TEXT DEFAULT 'pending',
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(sender_id) REFERENCES users(id),
+            FOREIGN KEY(receiver_id) REFERENCES users(id),
+            UNIQUE(sender_id, receiver_id)
+        )
+    ''')
+
     
     conn.commit()
     conn.close()
@@ -172,19 +185,31 @@ def upload_file():
         # Add to DB if authenticated
         auth_header = request.headers.get('Authorization')
         user_id = None
+        notify_friends = request.form.get('notify_friends') == 'true'
+
         if auth_header:
              # Extract token
             token = auth_header.split(" ")[1] if " " in auth_header else auth_header
             conn = connect_db()
             c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE auth_token = ?', (token,))
+            c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
             row = c.fetchone()
             if row:
-                user_id = row[0]
+                user_id, user_name = row
                 # Insert into photos
                 c.execute('INSERT INTO photos (filename, user_id) VALUES (?, ?)', (filename, user_id))
                 
+                c.execute('UPDATE users SET score = score + 10 WHERE id = ?', (user_id,))
                 
+                if notify_friends:
+                    # Find all friends
+                    c.execute('SELECT friend_id FROM friends WHERE user_id = ?', (user_id,))
+                    friends = c.fetchall()
+                    for friend_row in friends:
+                        friend_id = friend_row[0]
+                        msg = f"{user_name} just touched grass!"
+                        c.execute('INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)',
+                                  (friend_id, 'FEED_POST', msg))
                 
                 conn.commit()
             conn.close()
@@ -193,7 +218,7 @@ def upload_file():
             'message': 'Grass touched successfully!',
             'filename': filename,
             'url': f'/images/{filename}',
-            'score_added': 0 if user_id else 0
+            'score_added': 10 if user_id else 0
         }), 201
         
     return jsonify({'error': 'File type not allowed'}), 400
@@ -244,7 +269,7 @@ def get_notifications():
     # 1. Verify User
     c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
     user_row = c.fetchone()
-    
+    print(f"Found user row: {user_row}")
     if not user_row:
         conn.close()
         return jsonify({'error': 'Invalid auth token'}), 401
@@ -302,6 +327,155 @@ def get_friends(user_id):
     friends_list = [{'id': r[0], 'name': r[1]} for r in rows]
             
     return jsonify({'friends': friends_list}), 200
+
+@app.route('/friend_request/send', methods=['POST'])
+def send_friend_request():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+    
+    data = request.get_json()
+    target_username = data.get('username')
+    
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # 1. Get Sender ID
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+    sender = c.fetchone()
+    if not sender:
+        conn.close()
+        return jsonify({'error': 'Invalid auth token'}), 401
+    sender_id, sender_name = sender
+
+    # 2. Get Receiver ID
+    c.execute('SELECT id FROM users WHERE username = ?', (target_username,))
+    receiver = c.fetchone()
+    if not receiver:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    receiver_id = receiver[0]
+
+    if sender_id == receiver_id:
+        conn.close()
+        return jsonify({'error': 'Cannot friend yourself'}), 400
+
+    # 3. Check existing request or friendship
+    # Check if a request already exists
+    c.execute('SELECT id, status FROM friend_requests WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)', 
+              (sender_id, receiver_id, receiver_id, sender_id))
+    existing_req = c.fetchone()
+    
+    if existing_req:
+        conn.close()
+        status = existing_req[1]
+        if status == 'accepted':
+             return jsonify({'error': 'Already friends'}), 400
+        elif status == 'pending':
+             return jsonify({'error': 'Friend request already pending'}), 400
+        else:
+             # If rejected, maybe allow re-request? For now simpler to say pending.
+             return jsonify({'error': 'Request already exists'}), 400
+
+    # 4. Insert Request
+    c.execute('INSERT INTO friend_requests (sender_id, receiver_id, status) VALUES (?, ?, ?)', 
+              (sender_id, receiver_id, 'pending'))
+    
+    # Notify Receiver
+    msg = f"Friend request from {sender_name}"
+    c.execute('INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)',
+              (receiver_id, 'FRIEND_REQ', msg))
+
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': f'Friend request sent to {target_username}'}), 201
+
+@app.route('/friend_request/list', methods=['GET'])
+def list_friend_requests():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'error': 'Missing Authorization header'}), 401
+    token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+    
+    conn = connect_db()
+    c = conn.cursor()
+    
+    c.execute('SELECT id FROM users WHERE auth_token = ?', (token,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Invalid auth token'}), 401
+    user_id = user[0]
+
+    # Get pending requests received by this user
+    c.execute('''
+        SELECT fr.id, u.username, u.name, fr.timestamp 
+        FROM friend_requests fr
+        JOIN users u ON fr.sender_id = u.id
+        WHERE fr.receiver_id = ? AND fr.status = 'pending'
+    ''', (user_id,))
+    
+    reqs = c.fetchall()
+    conn.close()
+    
+    return jsonify({'requests': [{'req_id': r[0], 'username': r[1], 'name': r[2], 'timestamp': r[3]} for r in reqs]}), 200
+
+@app.route('/friend_request/respond', methods=['POST'])
+def respond_friend_request():
+    auth_header = request.headers.get('Authorization')
+    token = auth_header.split(" ")[1] if auth_header and " " in auth_header else auth_header
+    data = request.get_json()
+    req_id = data.get('req_id')
+    action = data.get('action') # 'accept' or 'reject'
+    
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # Validate user
+    c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Invalid auth token'}), 401
+    user_id, user_name = user
+
+    # Get request and verify it's for this user
+    c.execute('SELECT sender_id, receiver_id, status FROM friend_requests WHERE id = ?', (req_id,))
+    req = c.fetchone()
+    
+    if not req:
+        conn.close()
+        return jsonify({'error': 'Request not found'}), 404
+    
+    sender_id, receiver_id, status = req
+    
+    if receiver_id != user_id:
+        conn.close()
+        return jsonify({'error': 'Not authorized for this request'}), 403
+    
+    if action == 'accept':
+        # Update status
+        c.execute("UPDATE friend_requests SET status = 'accepted' WHERE id = ?", (req_id,))
+        # Add to friends table (bidirectional)
+        c.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (user_id, sender_id))
+        c.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (sender_id, user_id))
+        
+        # Notify Sender
+        c.execute("INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)",
+                  (sender_id, 'FRIEND_ACCEPT', f"{user_name} accepted your friend request!"))
+                  
+        msg = "Friend request accepted"
+    else:
+        # Reject
+        c.execute("UPDATE friend_requests SET status = 'rejected' WHERE id = ?", (req_id,))
+        msg = "Friend request rejected"
+        
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': msg}), 200
 
 @app.route('/leaderboard', methods=['GET']) # Changed route name
 def get_leaderboard_data():
@@ -393,11 +567,35 @@ def add_user(name):
     user_id = c.lastrowid
     db.close()
 
+def check_schema():
+    """Ensure all tables exist even if DB already exists."""
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # Create friend_requests table if it doesn't exist (migration for existing users)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER,
+            receiver_id INTEGER,
+            status TEXT DEFAULT 'pending',
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(sender_id) REFERENCES users(id),
+            FOREIGN KEY(receiver_id) REFERENCES users(id),
+            UNIQUE(sender_id, receiver_id)
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
 if __name__ == '__main__':
     # Initialize DB (create tables if they don't exist)
     if not os.path.exists('grassbuddy.db'):
         init_db()
         print("Initialized database 'grassbuddy.db'")
+    else:
+        check_schema()
+        print("Checked database schema.")
 
     # host='0.0.0.0' allows other devices on the network to access it
     ip = get_ip_address()

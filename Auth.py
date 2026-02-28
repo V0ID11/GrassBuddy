@@ -27,8 +27,8 @@ class AuthWidget(QWidget):
         
         # Header
         header = QLabel("Login to GrassBuddy")
+        header.setObjectName("header_label")
         header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
         self.container_layout.addWidget(header)
         
         # Inputs
@@ -68,8 +68,8 @@ class AuthWidget(QWidget):
         
         # Header
         header = QLabel("Create Account")
+        header.setObjectName("header_label")
         header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
         self.container_layout.addWidget(header)
         
         # Inputs

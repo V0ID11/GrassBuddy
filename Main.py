@@ -1,17 +1,45 @@
 from PyQt5 import QtWidgets as pyqt
-from PyQt5.QtWidgets import QStackedWidget, QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QScrollArea, QHBoxLayout
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QStackedWidget, QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QScrollArea, QHBoxLayout, QSystemTrayIcon, QStyle, QAction, QMenu
+from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt
 import requests
 from Camera import GrassBuddyCamera
 from Auth import AuthWidget
 from Leaderboard import GrassBuddyLeaderboard
+from Friends import FriendsWidget
+from networker import NudgeListener
+from Stylesheet import Stylesheet
+
+# Assuming server is local for now
+SERVER_URL = "http://10.2.0.2:5000"
 
 class MainWindow(pyqt.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GrassBuddy Main Window")
+        
+        # Apply Global Stylesheet
+        self.setStyleSheet(Stylesheet.DARK_THEME)
+
+        # System Tray Icon Setup
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
+        
+        # Tray Menu
+        tray_menu = QMenu()
+        show_action = QAction("Show", self)
+        show_action.triggered.connect(self.show)
+        quit_action = QAction("Exit", self)
+        quit_action.triggered.connect(pyqt.QApplication.instance().quit)
+        tray_menu.addAction(show_action)
+        tray_menu.addAction(quit_action)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+
         self.setGeometry(100, 100, 600, 400)
+        
+        # Nudge Listener
+        self.nudge_listener = None
 
         # QStackedWidget to hold multiple views
         self.stacked_widget = QStackedWidget()
@@ -37,6 +65,12 @@ class MainWindow(pyqt.QMainWindow):
         self.leaderboard_btn.setFixedHeight(50)
         self.leaderboard_btn.clicked.connect(self.show_leaderboard)
         self.main_menu_layout.addWidget(self.leaderboard_btn)
+
+        # Friends Button
+        self.friends_btn = QPushButton("Friends")
+        self.friends_btn.setFixedHeight(50)
+        self.friends_btn.clicked.connect(self.show_friends)
+        self.main_menu_layout.addWidget(self.friends_btn)
 
         # Feed Label
         self.feed_label = QLabel("Recent Feed (Top 10):")
@@ -67,6 +101,11 @@ class MainWindow(pyqt.QMainWindow):
         self.leaderboard_widget = GrassBuddyLeaderboard()
         self.leaderboard_widget.back_signal.connect(self.show_main_menu)
         self.stacked_widget.addWidget(self.leaderboard_widget)
+
+        # 5. Friends Widget (Index 4)
+        self.friends_widget = FriendsWidget()
+        self.friends_widget.back_signal.connect(self.show_main_menu)
+        self.stacked_widget.addWidget(self.friends_widget)
         
         # Start at Login (Index 0)
         self.stacked_widget.setCurrentIndex(0)
@@ -78,13 +117,38 @@ class MainWindow(pyqt.QMainWindow):
         self.leaderboard_widget.refresh_leaderboard()
         self.stacked_widget.setCurrentIndex(3)
 
+    def show_friends(self):
+        if self.current_user:
+            self.friends_widget.set_token(self.current_user['token'], self.current_user['user_id'])
+            # Refresh data
+            self.friends_widget.load_friends()
+            self.friends_widget.load_requests()
+        self.stacked_widget.setCurrentIndex(4)
+
     def on_login_success(self, user_data):
         self.current_user = user_data
         QMessageBox.information(self, "Welcome", f"Welcome back, {user_data['name']}!")
+        
+        # Start Nudge Listener
+        if self.nudge_listener:
+            self.nudge_listener.stop()
+        
+        self.nudge_listener = NudgeListener(user_data['token'], SERVER_URL) # Pass SERVER_URL here if using NudgeListener with api_url support
+        self.nudge_listener.nudge_received.connect(self.show_notification)
+        self.nudge_listener.start()
+        
         # Refresh Feed
         self.refresh_feed()
         # Switch to Main Menu
         self.stacked_widget.setCurrentIndex(1)
+        
+    def show_notification(self, message):
+         self.tray_icon.showMessage(
+            "GrassBuddy Nudge!",
+            message,
+            QSystemTrayIcon.Information,
+            3000
+        )
 
     def refresh_feed(self):
         # Clear existing layout
@@ -104,17 +168,17 @@ class MainWindow(pyqt.QMainWindow):
                 for item in feed_items:
                     # Create Feed Item Widget
                     item_widget = QWidget()
+                    item_widget.setObjectName("card")
                     item_layout = QVBoxLayout(item_widget)
-                    item_widget.setStyleSheet("border: 1px solid gray; margin: 5px;")
                     
                     # Username label
                     user_label = QLabel(f"User: {item['user']} - {item['timestamp']}")
-                    user_label.setStyleSheet("font-weight: bold; border: none;")
+                    user_label.setStyleSheet("font-weight: bold; border: none; background-color: transparent;")
                     item_layout.addWidget(user_label)
                     
                     # Image
                     img_label = QLabel()
-                    img_label.setStyleSheet("border: none;")
+                    img_label.setStyleSheet("border: none; background-color: transparent;")
                     image_url = f"http://10.2.0.2:5000{item['url']}"
                     
                     try:

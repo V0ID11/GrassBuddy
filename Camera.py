@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import requests
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QMessageBox, QHBoxLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QMessageBox, QHBoxLayout, QCheckBox
 from PyQt5.QtMultimedia import QCamera, QCameraInfo, QCameraImageCapture, QCameraViewfinderSettings
 from PyQt5.QtMultimediaWidgets import QCameraViewfinder
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
@@ -78,6 +78,10 @@ class GrassBuddyCamera(QWidget):
             self.switch_btn.clicked.connect(self.switch_camera)
             self.controls_layout.addWidget(self.switch_btn)
 
+        # Notify Friends Checkbox
+        self.notify_friends_chk = QCheckBox("Nudge Friends")
+        self.notify_friends_chk.setChecked(True)
+        self.controls_layout.addWidget(self.notify_friends_chk)
 
         self.capture_btn = QPushButton("Touch Grass (Take Photo)")
         self.capture_btn.setFixedHeight(50)
@@ -172,11 +176,12 @@ class GrassBuddyCamera(QWidget):
             try:
                 # Prepare headers
                 headers = {'Authorization': f'Bearer {self.user_token}'}
+                data = {'notify_friends': 'true' if self.notify_friends_chk.isChecked() else 'false'}
                 
                 # Prepare file
                 with open(filename, 'rb') as f:
                     files = {'file': f}
-                    response = requests.post(f"{SERVER_URL}/upload", files=files, headers=headers)
+                    response = requests.post(f"{SERVER_URL}/upload", files=files, data=data, headers=headers)
                 
                 if response.status_code == 201:
                     data = response.json()
