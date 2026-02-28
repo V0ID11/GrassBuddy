@@ -14,14 +14,24 @@ class FriendItem(QWidget):
         super().__init__(parent)
         self.user_id = user_id
         self.token = token
+        
+        # Increase bar size
+        self.setMinimumHeight(70)
+        
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(15, 10, 15, 10)
         
         self.label = QLabel(name)
+        # Make name larger
+        font = self.label.font()
+        font.setPointSize(14) 
+        self.label.setFont(font)
         layout.addWidget(self.label)
         
         self.nudge_btn = QPushButton("Nudge")
-        self.nudge_btn.setObjectName("secondary_btn")
+        # self.nudge_btn.setObjectName("secondary_btn") # Removed to make it primary (Green)
+        self.nudge_btn.setFixedSize(120, 45) # Bigger button
+        self.nudge_btn.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.nudge_btn.clicked.connect(self.send_nudge)
         layout.addWidget(self.nudge_btn)
 
