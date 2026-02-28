@@ -1,22 +1,20 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 
-import websockets
 import requests
-import asyncio
-import json
+import time
 
 
 api = "http://10.14.210.2:5000"
 nudge_url = f"{api}/nudge"
-websock = ""
+listen_url = f"{api}/notifications"
 
 
 class Nudger(QThread):
     """
     sends nudge events to api
     """
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)
+    error = pyqtSignal(bool, str)
 
     def __init__(self, target_uid, auth_tok):
         super().__init__()
@@ -37,40 +35,35 @@ class Nudger(QThread):
             else:
                 self.error.emit(False, f"Error {response.status_code}")
         except Exception as e:
-            self.error.emit(str(e))
+            self.error.emit(False, str(e))
 
 
 class NudgeListener(QThread):
     """
     listens for the nudge
     """
-    nudge_recieved = pyqtSignal(str)
+    nudge_received = pyqtSignal(str)
 
-    def __init__(self, user_tok):
+    def __init__(self, auth_tok):
         super().__init__()
-        self.user_tok = user_tok
+        self.auth_tok = auth_tok
         self._is_running = True
 
     def run(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.listen())
+        headers = {"Auth": f"Bearer {self.auth_tok}"}
+        while self._is_running:
+            try:
+                response = requests.get(listen_url,
+                                        headers=headers,
+                                        timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    for nudge in data.get("new_nudges", []):
+                        self.nudge_received.emit(nudge['sender_name'])
+            except Exception as e:
+                print(f"Polling error: {e}")
 
-    async def listen(self):
-        uri = f"{websock}/notifications?token={self.user_tok}"
-
-        try:
-            async with websockets.connect(uri) as websocket:
-                while self._is_running:
-                    message = await websocket.recv()
-                    data = json.loads(message)
-
-                    if data.get("type") == "nudge":
-                        sender = data.get("from_user", "someone")
-                        self.nudge_received.emit(sender)
-        except Exception as e:
-            print(f"Connection error: {e}")
+            time.sleep(5)
 
     def stop(self):
         self._is_running = False
-        self.quit()
