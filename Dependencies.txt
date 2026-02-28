@@ -1,5 +1,3 @@
 PyQt5
 flask
-json
-random
 requests
