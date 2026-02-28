@@ -208,6 +208,24 @@ def get_friends(user_id):
             
     return jsonify({'friends': friends_list}), 200
 
+@app.route('/leaderboard', methods=['GET']) # Changed route name
+def get_leaderboard_data():
+    conn = connect_db()
+    c = conn.cursor()
+    
+    # Get all users sorted by score (highest first)
+    c.execute('SELECT name, score FROM users ORDER BY score DESC')
+    rows = c.fetchall()
+    conn.close()
+    
+    if not rows:
+        return jsonify({'leaderboard_data': [], 'message': 'No users yet!'}), 200
+    
+    # Map rows to dictionary
+    leaderboard_list = [{'name': r[0], 'score': r[1]} for r in rows]
+            
+    return jsonify({'leaderboard_data': leaderboard_list}), 200
+
 @app.route('/nudge/<target_user_id>', methods=['POST'])
 def nudge_person(target_user_id):
     # Authenticate Sender
