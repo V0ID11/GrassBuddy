@@ -556,16 +556,6 @@ def get_ip_address():
     except Exception:
         return "127.0.0.1"
 
-@app.route('/add_user/<name>', methods=['POST'])
-def add_user(name):
-    db = connect_db()
-    c = db.cursor()
-    # Generate a simple auth token (in production, use something secure)
-    auth_token = f"auth_{name.lower()}_{len(users) + 1}"
-    c.execute("INSERT INTO users (name, auth_token) VALUES (?, ?)", (name, auth_token))
-    db.commit()
-    user_id = c.lastrowid
-    db.close()
 
 def check_schema():
     """Ensure all tables exist even if DB already exists."""
