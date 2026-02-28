@@ -2,6 +2,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 import requests
 import time
+import re
 
 
 api = "http://10.14.210.2:5000"
@@ -23,11 +24,9 @@ class Nudger(QThread):
 
     def run(self):
         self.started.emit()
-        headers = {"Auth": f"Bearer {self.auth_tok}"}
-        payload = {"recipient_id": self.target_uid}
+        headers = {"Authorization": f"Bearer {self.auth_tok}"}
         try:
-            response = requests.post(nudge_url,
-                                     json=payload,
+            response = requests.post(f"{nudge_url}/{self.target_uid}",
                                      headers=headers,
                                      timeout=5)
             if response.status_code == 200:
@@ -50,7 +49,7 @@ class NudgeListener(QThread):
         self._is_running = True
 
     def run(self):
-        headers = {"Auth": f"Bearer {self.auth_tok}"}
+        headers = {"Authorization": f"Bearer {self.auth_tok}"}
         while self._is_running:
             try:
                 response = requests.get(listen_url,
@@ -58,8 +57,12 @@ class NudgeListener(QThread):
                                         timeout=5)
                 if response.status_code == 200:
                     data = response.json()
-                    for nudge in data.get("new_nudges", []):
-                        self.nudge_received.emit(nudge['sender_name'])
+                    for nudge in data.get("notifications"):
+                        message = nudge['message']
+                        #name = re.search("(from *)", message).string
+                        #message_content = ""
+                        self.nudge_received.emit(message)
+
             except Exception as e:
                 print(f"Polling error: {e}")
 
