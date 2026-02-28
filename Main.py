@@ -9,6 +9,7 @@ from Leaderboard import GrassBuddyLeaderboard
 from Friends import FriendsWidget
 from networker import NudgeListener
 from Stylesheet import Stylesheet
+import os
 
 # Assuming server is local for now
 SERVER_URL = os.getenv("GRASSAPI")
