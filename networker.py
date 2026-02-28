@@ -56,6 +56,7 @@ class NudgeListener(QThread):
                                         timeout=5)
                 if response.status_code == 200:
                     data = response.json()
+                    #print(data)
                     for nudge in data.get("notifications"):
                         message = nudge['message']
                         self.nudge_received.emit(message)
