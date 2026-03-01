@@ -44,7 +44,7 @@ class AuthWidget(QWidget):
         
         # Login Button
         login_btn = QPushButton("Login")
-        login_btn.setFixedHeight(40)
+        login_btn.setFixedHeight(80)
         login_btn.clicked.connect(self.handle_login)
         self.container_layout.addWidget(login_btn)
         
@@ -89,7 +89,7 @@ class AuthWidget(QWidget):
         
         # Register Button
         register_btn = QPushButton("Sign Up")
-        register_btn.setFixedHeight(40)
+        register_btn.setFixedHeight(80)
         register_btn.clicked.connect(self.handle_register)
         self.container_layout.addWidget(register_btn)
         

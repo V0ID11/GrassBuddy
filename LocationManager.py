@@ -117,8 +117,8 @@ class LocationManager:
             return None
 
         # self.user_location.set_location(lat, lng)
-        self.user_location.set_location(50.9377215432145, -1.3980270473247782)
-
+        # self.user_location.set_location(50.9377215432145, -1.3980270473247782)
+        self.user_location.set_location(lat,lng)
         return self.user_location.get_coords()
     
     # Gets an image of the route to the nearest grass

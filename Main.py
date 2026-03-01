@@ -38,7 +38,7 @@ class MainWindow(pyqt.QMainWindow):
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
 
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(100, 100, 1200, 900)
         
         # Nudge Listener
         self.nudge_listener = None
@@ -55,34 +55,69 @@ class MainWindow(pyqt.QMainWindow):
         # 2. Main Menu Widget (Index 1)
         self.main_menu_widget = QWidget()
         self.main_menu_layout = QVBoxLayout(self.main_menu_widget)
+        self.main_menu_layout.setSpacing(15) # Add more space between elements
+        self.main_menu_layout.setContentsMargins(40, 40, 40, 40) # Add padding to sides
+
+        # Header with User Info & Streak
+        self.user_info_label = QLabel("Welcome!")
+        self.user_info_label.setObjectName("header_label")
+        self.user_info_label.setAlignment(Qt.AlignCenter)
+        self.main_menu_layout.addWidget(self.user_info_label)
+
+        self.streak_label = QLabel("🔥 0 Day Streak")
+        self.streak_label.setAlignment(Qt.AlignCenter)
+        self.streak_label.setStyleSheet("color: #FF7043; font-size: 24px; font-weight: bold; margin-bottom: 20px;")
+        self.main_menu_layout.addWidget(self.streak_label)
+
+        # Buttons Grid
+        buttons_grid = QVBoxLayout()
+        buttons_grid.setSpacing(15)
+
+        # Row 1
+        row1 = QHBoxLayout()
+        row1.setSpacing(15)
         
-        # Camera Button on Main Menu
-        self.camera_btn = QPushButton("Open Camera")
-        self.camera_btn.setFixedHeight(50)
+        # Camera Button
+        self.camera_btn = QPushButton("📷 Open Camera")
+        self.camera_btn.setFixedHeight(120)
         self.camera_btn.clicked.connect(self.show_camera)
-        self.main_menu_layout.addWidget(self.camera_btn)
+        row1.addWidget(self.camera_btn)
 
         # Leaderboard Button
-        self.leaderboard_btn = QPushButton("Leaderboard")
-        self.leaderboard_btn.setFixedHeight(50)
+        self.leaderboard_btn = QPushButton("🏆 Leaderboard")
+        self.leaderboard_btn.setFixedHeight(120)
         self.leaderboard_btn.clicked.connect(self.show_leaderboard)
-        self.main_menu_layout.addWidget(self.leaderboard_btn)
+        row1.addWidget(self.leaderboard_btn)
+        
+        buttons_grid.addLayout(row1)
+        
+        # Row 2
+        row2 = QHBoxLayout()
+        row2.setSpacing(15)
 
         # Friends Button
-        self.friends_btn = QPushButton("Friends")
-        self.friends_btn.setFixedHeight(50)
+        self.friends_btn = QPushButton("👥 Friends")
+        self.friends_btn.setFixedHeight(120)
         self.friends_btn.clicked.connect(self.show_friends)
-        self.main_menu_layout.addWidget(self.friends_btn)
+        row2.addWidget(self.friends_btn)
 
         # Map Button
-        self.map_btn = QPushButton("Find Nearby Park")
-        self.map_btn.setFixedHeight(50)
+        self.map_btn = QPushButton("🗺️ Find Nearby Park")
+        self.map_btn.setFixedHeight(120)
         self.map_btn.clicked.connect(self.show_map)
-        self.main_menu_layout.addWidget(self.map_btn)
+        row2.addWidget(self.map_btn)
+        
+        buttons_grid.addLayout(row2)
+        self.main_menu_layout.addLayout(buttons_grid)
 
         # Feed Label
-        self.feed_label = QLabel("Recent Feed (Top 10):")
+        self.feed_label = QLabel("Recent Activity")
+        self.feed_label.setObjectName("sub_header")
+        self.feed_label.setStyleSheet("margin-top: 20px;")
         self.main_menu_layout.addWidget(self.feed_label)
+        
+        # Spacer
+        self.main_menu_layout.addSpacing(10)
 
         # Scroll Area for Feed
         self.feed_scroll_area = QScrollArea()
@@ -143,6 +178,11 @@ class MainWindow(pyqt.QMainWindow):
 
     def on_login_success(self, user_data):
         self.current_user = user_data
+        self.user_info_label.setText(f"Hello, {user_data['name']}!")
+        
+        streak = user_data.get('streak', 0)
+        self.streak_label.setText(f"🔥 {streak} Day Streak")
+        
         QMessageBox.information(self, "Welcome", f"Welcome back, {user_data['name']}!")
         
         # Start Nudge Listener

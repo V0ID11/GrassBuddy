@@ -18,7 +18,7 @@ class MapScreen(QWidget):
         # Header Area
         header_layout = QHBoxLayout()
         self.back_btn = QPushButton("Back")
-        self.back_btn.setFixedSize(80, 40)
+        self.back_btn.setFixedSize(120, 70)
         self.back_btn.clicked.connect(self.back_signal.emit)
         header_layout.addWidget(self.back_btn)
         
@@ -29,7 +29,7 @@ class MapScreen(QWidget):
         
         # Spacer for balance
         spacer = QLabel()
-        spacer.setFixedSize(80, 40)
+        spacer.setFixedSize(120, 70)
         header_layout.addWidget(spacer)
         
         self.layout.addLayout(header_layout)
@@ -44,11 +44,12 @@ class MapScreen(QWidget):
         self.map_label = QLabel()
         self.map_label.setAlignment(Qt.AlignCenter)
         self.map_label.setStyleSheet("border: 2px solid #555;")
-        self.map_label.setMinimumSize(400, 300)
+        self.map_label.setMinimumSize(800, 500)
         self.layout.addWidget(self.map_label)
         
         # Action Button
         self.find_btn = QPushButton("Find Nearby Park")
+        self.find_btn.setFixedHeight(80)
         self.find_btn.clicked.connect(self.load_map_data)
         self.layout.addWidget(self.find_btn)
         

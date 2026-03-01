@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from werkzeug.security import generate_password_hash
+from datetime import date, timedelta
 
 DB_NAME = 'grassbuddy.db'
 
@@ -28,7 +29,9 @@ def seed_database():
             password_hash TEXT NOT NULL,
             name TEXT NOT NULL,
             auth_token TEXT,
-            score INTEGER DEFAULT 0
+            score INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            last_post_date TEXT
         )
     ''')
     
@@ -62,14 +65,21 @@ def seed_database():
     ''')
 
     print("Inserting users...")
+    
+    today = date.today().isoformat()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    two_days_ago = (date.today() - timedelta(days=2)).isoformat()
+    
+    # Format: username, password, name, token, score, streak, last_post_date
     users = [
-        ('nick123', generate_password_hash('password'), 'Nick', 'auth_nick_1'),
-        ('sarah_cool', generate_password_hash('password'), 'Sarah', 'auth_sarah_2'),
-        ('mike_touch', generate_password_hash('password'), 'Mike', 'auth_mike_3'),
-        ('emma_grass', generate_password_hash('password'), 'Emma', 'auth_emma_4'),
-        ('sam_pards', generate_password_hash('password'), 'Sam', 'auth_sam_5')
+        ('nick123', generate_password_hash('password'), 'Nick', 'auth_nick_1', 150, 5, yesterday), # Active streak
+        ('sarah_cool', generate_password_hash('password'), 'Sarah', 'auth_sarah_2', 300, 12, today), # Active streak, posted today
+        ('mike_touch', generate_password_hash('password'), 'Mike', 'auth_mike_3', 20, 0, None), # No streak
+        ('emma_grass', generate_password_hash('password'), 'Emma', 'auth_emma_4', 50, 1, two_days_ago), # Broken streak
+        ('sam_pards', generate_password_hash('password'), 'Sam', 'auth_sam_5', 1000, 45, yesterday) # Long streak
     ]
-    c.executemany("INSERT INTO users (username, password_hash, name, auth_token) VALUES (?, ?, ?, ?)", users)
+    
+    c.executemany("INSERT INTO users (username, password_hash, name, auth_token, score, streak, last_post_date) VALUES (?, ?, ?, ?, ?, ?, ?)", users)
     
     # Get user Ids
     c.execute("SELECT id, name FROM users")

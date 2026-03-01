@@ -30,8 +30,8 @@ class FriendItem(QWidget):
         
         self.nudge_btn = QPushButton("Nudge")
         # self.nudge_btn.setObjectName("secondary_btn") # Removed to make it primary (Green)
-        self.nudge_btn.setFixedSize(120, 45) # Bigger button
-        self.nudge_btn.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.nudge_btn.setFixedSize(140, 70) # Bigger button
+        self.nudge_btn.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.nudge_btn.clicked.connect(self.send_nudge)
         layout.addWidget(self.nudge_btn)
 
@@ -65,10 +65,12 @@ class FriendRequestItem(QWidget):
         layout.addWidget(self.label)
         
         self.accept_btn = QPushButton("Accept")
+        self.accept_btn.setFixedHeight(70)
         self.accept_btn.setObjectName("primary_btn") # Uses default success color
         layout.addWidget(self.accept_btn)
         
         self.reject_btn = QPushButton("Reject")
+        self.reject_btn.setFixedHeight(70)
         self.reject_btn.setObjectName("danger_btn")
         layout.addWidget(self.reject_btn)
 
@@ -86,6 +88,7 @@ class FriendsWidget(QWidget):
         # Header with Back Button
         header_layout = QHBoxLayout()
         self.back_btn = QPushButton("Back")
+        self.back_btn.setFixedSize(120, 70)
         self.back_btn.clicked.connect(self.back_signal.emit)
         header_layout.addWidget(self.back_btn)
         header_layout.addStretch()
@@ -101,6 +104,7 @@ class FriendsWidget(QWidget):
         self.friends_list = QListWidget()
         self.friends_layout.addWidget(self.friends_list)
         self.refresh_friends_btn = QPushButton("Refresh Friends")
+        self.refresh_friends_btn.setFixedHeight(70)
         self.refresh_friends_btn.clicked.connect(self.load_friends)
         self.friends_layout.addWidget(self.refresh_friends_btn)
         self.tabs.addTab(self.friends_tab, "My Friends")

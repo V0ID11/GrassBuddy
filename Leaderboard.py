@@ -12,7 +12,7 @@ SERVER_URL = os.getenv("GRASSAPI")
 class LeaderboardItem(QFrame):
     def __init__(self, rank, name, score, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(80)
+        self.setFixedHeight(100)
         self.setStyleSheet("""
             QFrame {
                 background-color: #424242;
@@ -80,7 +80,7 @@ class GrassBuddyLeaderboard(QMainWindow):
         header_layout = QHBoxLayout()
         
         self.back_btn = QPushButton("Back")
-        self.back_btn.setFixedSize(100, 45)
+        self.back_btn.setFixedSize(120, 70)
         self.back_btn.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.back_btn.clicked.connect(self.back_signal.emit)
         header_layout.addWidget(self.back_btn)
@@ -92,7 +92,7 @@ class GrassBuddyLeaderboard(QMainWindow):
         
         # Spacer
         spacer = QLabel()
-        spacer.setFixedSize(100, 45)
+        spacer.setFixedSize(120, 70)
         header_layout.addWidget(spacer)
         
         self.main_layout.addLayout(header_layout)
@@ -120,7 +120,7 @@ class GrassBuddyLeaderboard(QMainWindow):
         
         # Refresh Button at Bottom
         self.refresh_btn = QPushButton("Refresh Leaderboard")
-        self.refresh_btn.setFixedHeight(50)
+        self.refresh_btn.setFixedHeight(80)
         self.refresh_btn.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.refresh_btn.clicked.connect(self.refresh_leaderboard)
         self.main_layout.addWidget(self.refresh_btn)

@@ -5,6 +5,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import socket
 import sqlite3
 import uuid
+import cv2
+import numpy as np
+import datetime
 
 app = Flask(__name__)
 
@@ -23,6 +26,42 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def is_green_foliage(image_path):
+    """
+    Checks if an image is likely grass/foliage by analyzing green content.
+    Returns: bool
+    """
+    try:
+        # Load image
+        img = cv2.imread(image_path)
+        if img is None:
+            return False
+
+        # Convert to HSV color space
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # Define range for green color in HSV (OpenCV uses H:0-179, S:0-255, V:0-255)
+        # H: 35-85 (Light green to dark green)
+        # S: 40-255 (Avoid very pale greens/grays)
+        # V: 40-255 (Avoid very dark images)
+        lower_green = np.array([35, 40, 40])
+        upper_green = np.array([85, 255, 255])
+
+        # Create a mask for green pixels
+        mask = cv2.inRange(hsv_img, lower_green, upper_green)
+
+        # Calculate percentage of green pixels
+        green_pixel_count = cv2.countNonZero(mask)
+        total_pixel_count = img.shape[0] * img.shape[1]
+        green_ratio = green_pixel_count / total_pixel_count
+
+        # Threshold: assume foliage if > 15% green pixels
+        return green_ratio > 0.15
+
+    except Exception as e:
+        print(f"Error processing image {image_path}: {e}")
+        return False
+
 def init_db():
     conn = sqlite3.connect('grassbuddy.db')
     c = conn.cursor()
@@ -35,7 +74,9 @@ def init_db():
             password_hash TEXT NOT NULL,
             name TEXT NOT NULL,
             auth_token TEXT,
-            score INTEGER DEFAULT 0
+            score INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            last_post_date TEXT
         )
     ''')
     
@@ -138,14 +179,14 @@ def login():
     conn = connect_db()
     c = conn.cursor()
     
-    c.execute('SELECT id, password_hash, name FROM users WHERE username = ?', (username,))
+    c.execute('SELECT id, password_hash, name, streak FROM users WHERE username = ?', (username,))
     row = c.fetchone()
     
     if not row:
         conn.close()
         return jsonify({'error': 'Invalid credentials'}), 401
         
-    user_id, stored_hash, name = row
+    user_id, stored_hash, name, streak = row
     
     if check_password_hash(stored_hash, password):
         # Login success! Generate a token for this session
@@ -159,7 +200,8 @@ def login():
             'message': 'Login successful',
             'token': token,
             'user_id': user_id,
-            'name': name
+            'name': name,
+            'streak': row[3] if len(row) > 3 else 0 # Return streak on login
         }), 200
     else:
         conn.close()
@@ -182,7 +224,13 @@ def upload_file():
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
         
+        # Verify content is grass/foliage
+        if not is_green_foliage(save_path):
+            os.remove(save_path)
+            return jsonify({'error': 'Image does not look like grass or foliage (not enough green)!'}), 400
+        
         # Add to DB if authenticated
+
         auth_header = request.headers.get('Authorization')
         user_id = None
         notify_friends = request.form.get('notify_friends') == 'true'
@@ -192,14 +240,68 @@ def upload_file():
             token = auth_header.split(" ")[1] if " " in auth_header else auth_header
             conn = connect_db()
             c = conn.cursor()
-            c.execute('SELECT id, name FROM users WHERE auth_token = ?', (token,))
+            c.execute('SELECT id, name, streak, last_post_date FROM users WHERE auth_token = ?', (token,))
             row = c.fetchone()
             if row:
-                user_id, user_name = row
+                user_id, user_name, current_streak, last_post_date = row
+                
+                # REGROWTH CHECK (Cooldown)
+                # Check the timestamp of the very last photo uploaded by this user
+                c.execute('SELECT timestamp FROM photos WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,))
+                last_photo_row = c.fetchone()
+                
+                if last_photo_row:
+                    last_ts_str = last_photo_row[0]
+                    # SQLite default timestamp format: YYYY-MM-DD HH:MM:SS
+                    try:
+                        last_ts = datetime.datetime.strptime(last_ts_str, "%Y-%m-%d %H:%M:%S")
+                        time_since_last = datetime.datetime.now() - last_ts
+                        # 30 minute cooldown (Regrowth factor)
+                        if time_since_last.total_seconds() < 1800: 
+                            minutes_left = 30 - int(time_since_last.total_seconds() / 60)
+                            conn.close()
+                            # Delete the file we just saved since it's invalid
+                            try:
+                                os.remove(save_path)
+                            except:
+                                pass
+                            return jsonify({'error': f'Grass takes time to regrow! Please wait {minutes_left} minutes.'}), 429
+                    except ValueError:
+                        # Handle potential timezone strings or other formats just in case
+                        pass
+
                 # Insert into photos
                 c.execute('INSERT INTO photos (filename, user_id) VALUES (?, ?)', (filename, user_id))
                 
-                c.execute('UPDATE users SET score = score + 10 WHERE id = ?', (user_id,))
+                # Update Score & Streak
+                today = datetime.date.today().isoformat()
+                score_increment = 10
+                new_streak = current_streak
+                
+                if last_post_date == today:
+                    # Already posted today, no streak change
+                    pass
+                else:
+                    if last_post_date:
+                        last_date = datetime.date.fromisoformat(last_post_date)
+                        delta = (datetime.date.today() - last_date).days
+                        if delta == 1:
+                            # Posted yesterday, increment streak
+                            new_streak += 1
+                        else:
+                            # Missed a day (or more), reset to 1
+                            new_streak = 1
+                    else:
+                        # First post ever
+                        new_streak = 1
+                    
+                    # Update user record
+                    c.execute('UPDATE users SET score = score + ?, streak = ?, last_post_date = ? WHERE id = ?', 
+                              (score_increment, new_streak, today, user_id))
+
+                    if new_streak > 1 and new_streak > current_streak:
+                         msg = f"{user_name} is on a {new_streak} day streak!"
+                         # Notify friends about streak?? Maybe just feed post.
                 
                 if notify_friends:
                     # Find all friends
@@ -208,6 +310,9 @@ def upload_file():
                     for friend_row in friends:
                         friend_id = friend_row[0]
                         msg = f"{user_name} just touched grass!"
+                        if new_streak > 1:
+                            msg += f" ({new_streak} day streak!)"
+                        
                         c.execute('INSERT INTO notifications (user_id, type, message) VALUES (?, ?, ?)',
                                   (friend_id, 'FEED_POST', msg))
                 
@@ -218,7 +323,8 @@ def upload_file():
             'message': 'Grass touched successfully!',
             'filename': filename,
             'url': f'/images/{filename}',
-            'score_added': 10 if user_id else 0
+            'score_added': 10 if user_id else 0,
+            'streak': new_streak if user_id else 0
         }), 201
         
     return jsonify({'error': 'File type not allowed'}), 400

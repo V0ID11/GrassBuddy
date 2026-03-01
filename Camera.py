@@ -67,14 +67,14 @@ class GrassBuddyCamera(QWidget):
 
 
         self.back_btn = QPushButton("Back")
-        self.back_btn.setFixedHeight(50)
+        self.back_btn.setFixedHeight(80)
         self.back_btn.clicked.connect(self.close_camera)
         self.controls_layout.addWidget(self.back_btn)
 
 
         if len(self.available_cameras) > 1:
             self.switch_btn = QPushButton("Switch Camera")
-            self.switch_btn.setFixedHeight(50)
+            self.switch_btn.setFixedHeight(80)
             self.switch_btn.clicked.connect(self.switch_camera)
             self.controls_layout.addWidget(self.switch_btn)
 
@@ -84,7 +84,7 @@ class GrassBuddyCamera(QWidget):
         self.controls_layout.addWidget(self.notify_friends_chk)
 
         self.capture_btn = QPushButton("Touch Grass (Take Photo)")
-        self.capture_btn.setFixedHeight(50)
+        self.capture_btn.setFixedHeight(120)
         self.capture_btn.clicked.connect(self.capture_image)
         self.controls_layout.addWidget(self.capture_btn)
 
